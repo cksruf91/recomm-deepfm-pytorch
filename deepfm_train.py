@@ -4,14 +4,14 @@ import sys
 import time
 from typing import Callable
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
 from torch.optim import Adagrad, Adadelta, Adam
+from torch.utils.data import DataLoader
 
-from config import CONFIG
 from common.data_iterator import Iterator, TestIterator
+from config import CONFIG
 from model.deepfm_model import DeepFactorizationMachineModel
 from model.metrics import nDCG, RecallAtK
 
@@ -26,7 +26,7 @@ def args():
     parser.add_argument('-bs', '--batch_size', default=256, help='batch size', type=int)
     parser.add_argument('-ly', '--layers', default=[64, 32], help='mlp layer size', type=int, nargs='+')
     parser.add_argument('-o', '--dropout', default=0.2, help='dropout ratio', type=float)
-    parser.add_argument('-cpu', '--cpu',  action='store_true', help='')
+    parser.add_argument('-cpu', '--cpu', action='store_true', help='')
 
     return parser.parse_args()
 
@@ -63,7 +63,6 @@ def train_progressbar(total: int, i: int, bar_length: int = 50, prefix: str = ''
 
 
 def train(model, epoch, train_dataloader, test_dataloader, loss_func, optim, metrics=[], callback=[]):
-    
     for e in range(epoch):
         # ------ train --------
         model.train()
@@ -107,7 +106,6 @@ def train(model, epoch, train_dataloader, test_dataloader, loss_func, optim, met
         y_pred, y_true = [], []
         with torch.no_grad():
             for step, (data, labels) in enumerate(test_dataloader):
-
                 # random shuffle
                 idx = torch.randperm(len(data))
                 data = data[idx]
@@ -118,9 +116,9 @@ def train(model, epoch, train_dataloader, test_dataloader, loss_func, optim, met
                 val_loss += loss.item()
 
                 _, indices = torch.topk(pred, k=10)
-                y_pred.append(data[indices][:,2].cpu().tolist())
-                y_true.append(data[labels == 1][0,2].item())
-        
+                y_pred.append(data[indices][:, 2].cpu().tolist())
+                y_true.append(data[labels == 1][0, 2].item())
+
         history['val_loss'] = val_loss / step
         result = f" val_loss : {history['val_loss']:3.3f}"
 
@@ -128,11 +126,12 @@ def train(model, epoch, train_dataloader, test_dataloader, loss_func, optim, met
             metrics_value = func(y_pred, y_true)
             history[f'{func}'] = metrics_value
             result += f' val_{func} : {metrics_value:3.3f}'
-            
+
         for func in callback:
             func(model, history)
-        
-        print(f" val_loss : {history['val_loss']:3.3f}, nDCG : {history['nDCG']:3.3f}, recall : {history['recallAtK']:3.3f} ")
+
+        print(
+            f" val_loss : {history['val_loss']:3.3f}, nDCG : {history['nDCG']:3.3f}, recall : {history['recallAtK']:3.3f} ")
 
 
 if __name__ == '__main__':
@@ -147,7 +146,7 @@ if __name__ == '__main__':
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     if argument.cpu:
         device = torch.device('cpu')
-        
+
     model_params = {
         'learningRate': argument.learning_rate,
         'loss': 'BCELoss',
@@ -157,17 +156,17 @@ if __name__ == '__main__':
         'negative_size': 5,
         'num_users': train_data['user_id'].nunique(), 'num_items': train_data['item_id'].nunique()
     }
-        
+
     train_iterator = Iterator(train_data, device=device)
     train_dataloader = DataLoader(train_iterator, batch_size=argument.batch_size, shuffle=True)
     test_iterator = TestIterator(test_data, os.path.join(save_dir, 'negative_test.dat'), device=device)
     # test_dataloader = DataLoader(test_iterator, batch_size=1, shuffle=False)
 
     field_dims = np.max(train_iterator.data, axis=0) + 1
-    
+
     # item_id 와 prev_item_id 가 embedding parameter를 공유하도록 한다.
-    field_dims[1] = 0 # array([6040, 3883, 3883]) -> array([6040, 0, 3883]) 
-    
+    field_dims[1] = 0  # array([6040, 3883, 3883]) -> array([6040, 0, 3883])
+
     model = DeepFactorizationMachineModel(
         field_dims, embed_dim=argument.embed_dim, mlp_dims=argument.layers, dropout=argument.dropout, device=device
     )
@@ -175,22 +174,21 @@ if __name__ == '__main__':
     param_size = 0
     for param in model.parameters():
         param_size += param.nelement() * param.element_size()
-    print(f'model size : {param_size/1024/1024:1.5f} mb')
-    
+    print(f'model size : {param_size / 1024 / 1024:1.5f} mb')
+
     loss_func = torch.nn.BCELoss()
     optim = get_optimizer(model, model_params['optimizer'], model_params['learningRate'])
     metrics = [nDCG(), RecallAtK()]
-    
-    
+
     model_version = f'deepfm_v{argument.model_version}'
     callback = [
-        # ModelCheckPoint(os.path.join(
-        #     'result', argument.dataset, 
-        #     model_version + '-e{epoch:02d}-loss{val_loss:1.3f}-nDCG{val_nDCG:1.3f}.zip'),
-        #     monitor='val_nDCG', mode='max'
-        # ),
-        # MlflowLogger(experiment_name=argument.dataset, model_params=model_params, run_name=model_version,
-        #              log_model=False)
+        ModelCheckPoint(os.path.join(
+            'result', argument.dataset,
+            model_version + '-e{epoch:02d}-loss{val_loss:1.3f}-nDCG{val_nDCG:1.3f}.zip'),
+            monitor='val_nDCG', mode='max'
+        ),
+        MlflowLogger(experiment_name=argument.dataset, model_params=model_params, run_name=model_version,
+                     log_model=False)
     ]
-    
+
     train(model, 50, train_dataloader, test_iterator, loss_func, optim, metrics=metrics, callback=callback)

@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 
 class FeaturesLinear(torch.nn.Module):
@@ -90,13 +89,13 @@ class DeepFactorizationMachineModel(torch.nn.Module):
         self.embedding = FeaturesEmbedding(field_dims, embed_dim)
         self.embed_output_dim = len(field_dims) * embed_dim
         self.mlp = MultiLayerPerceptron(self.embed_output_dim, mlp_dims, dropout)
-        
+
         self.to(device)
 
     def forward(self, x):
         """
         :param x: Long tensor of size ``(batch_size, num_fields)``
         """
-        embed_x = self.embedding(x) # [batch_size, num_fields, emb_size] <-[batch_size, num_fields]
+        embed_x = self.embedding(x)  # [batch_size, num_fields, emb_size] <-[batch_size, num_fields]
         x = self.linear(x) + self.fm(embed_x) + self.mlp(embed_x.view(-1, self.embed_output_dim))
         return torch.sigmoid(x.squeeze(1))

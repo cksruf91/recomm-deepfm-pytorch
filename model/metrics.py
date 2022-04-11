@@ -92,4 +92,3 @@ class PrecisionAtK(Metrics):
         hits = np.array(output) == np.array(label).reshape(-1, 1)
         precision = np.sum(hits, axis=-1) / k
         return np.mean(precision)
-
