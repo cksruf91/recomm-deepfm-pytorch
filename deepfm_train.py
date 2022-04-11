@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 
 from common.data_iterator import Iterator, TestIterator
 from config import CONFIG
+from model.callbacks import ModelCheckPoint, MlflowLogger
 from model.deepfm_model import DeepFactorizationMachineModel
 from model.metrics import nDCG, RecallAtK
 
