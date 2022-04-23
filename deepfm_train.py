@@ -74,14 +74,14 @@ def train(model, epoch, train_dataloader, test_dataloader, loss_func, optim, met
 
         history = {}
 
-        for step, (data, labels) in enumerate(train_dataloader):
+        for step, (data, genres, labels) in enumerate(train_dataloader):
             # ------ step start ------
             if ((step + 1) % 50 == 0) | (step + 1 >= total_step):
                 train_progressbar(
                     total_step, step + 1, bar_length=30,
                     prefix=f'train {e + 1:03d}/{epoch} epoch', suffix=f'{time.time() - start_epoch_time:0.2f} sec '
                 )
-            pred = model(data)
+            pred = model(data, genres)
             loss = loss_func(pred, labels)
 
             loss.backward()
@@ -106,13 +106,15 @@ def train(model, epoch, train_dataloader, test_dataloader, loss_func, optim, met
         val_loss = 0
         y_pred, y_true = [], []
         with torch.no_grad():
-            for step, (data, labels) in enumerate(test_dataloader):
+            for step, (data, genres, labels) in enumerate(test_dataloader):
+
                 # random shuffle
                 idx = torch.randperm(len(data))
                 data = data[idx]
+                genres = genres[idx]
                 labels = labels[idx]
 
-                pred = model(data)
+                pred = model(data, genres)
                 loss = loss_func(pred, labels)
                 val_loss += loss.item()
 
@@ -143,6 +145,10 @@ if __name__ == '__main__':
     test_data = pd.read_csv(os.path.join(save_dir, 'test.tsv'), sep='\t')
     item_meta = pd.read_csv(os.path.join(save_dir, 'item_meta.tsv'), sep='\t', low_memory=False)
     user_meta = pd.read_csv(os.path.join(save_dir, 'user_meta.tsv'), sep='\t')
+    
+    genres_columns = ['Adventure', 'Crime', 'Animation', 'Western', 'Documentary', 'Mystery',
+                     'Musical', 'Drama', 'Comedy', 'Fantasy', 'Horror', 'Action', 'Thriller',
+                     'War', 'Film-Noir', 'Sci-Fi', 'Romance', 'Children\'s']
 
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     if argument.cpu:
@@ -169,7 +175,8 @@ if __name__ == '__main__':
     field_dims[1] = 0  # array([6040, 3883, 3883]) -> array([6040, 0, 3883])
 
     model = DeepFactorizationMachineModel(
-        field_dims, embed_dim=argument.embed_dim, mlp_dims=argument.layers, dropout=argument.dropout, device=device
+        field_dims, multi_hot_size=len(genres_columns), 
+        embed_dim=argument.embed_dim, mlp_dims=argument.layers, dropout=argument.dropout, device=device
     )
     print(model)
     param_size = 0
@@ -183,13 +190,13 @@ if __name__ == '__main__':
 
     model_version = f'deepfm_v{argument.model_version}'
     callback = [
-        ModelCheckPoint(os.path.join(
-            'result', argument.dataset,
-            model_version + '-e{epoch:02d}-loss{val_loss:1.3f}-nDCG{val_nDCG:1.3f}.zip'),
-            monitor='val_nDCG', mode='max'
-        ),
-        MlflowLogger(experiment_name=argument.dataset, model_params=model_params, run_name=model_version,
-                     log_model=False)
+        # ModelCheckPoint(os.path.join(
+        #     'result', argument.dataset,
+        #     model_version + '-e{epoch:02d}-loss{val_loss:1.3f}-nDCG{val_nDCG:1.3f}.zip'),
+        #     monitor='val_nDCG', mode='max'
+        # ),
+        # MlflowLogger(experiment_name=argument.dataset, model_params=model_params, run_name=model_version,
+        #              log_model=False)
     ]
 
     train(model, 50, train_dataloader, test_iterator, loss_func, optim, metrics=metrics, callback=callback)
