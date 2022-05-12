@@ -1,17 +1,16 @@
 # recomm-deepfm-pytorch
 
-___work in progress___
 ## Dataset
 * [MovieLens 1M Dataset](https://grouplens.org/datasets/movielens/1m/)
 ```bash
-cd {project Dir}/recomm-hrnn-pytorch/datasets/movielens
+cd {project Dir}/datasets/movielens
 wget https://files.grouplens.org/datasets/movielens/ml-1m.zip
 unzip ml-1m.zip
 ```
 
 * [MovieLens 10M Dataset](https://grouplens.org/datasets/movielens/10m/)
 ```bash
-cd {project Dir}/recomm-hrnn-pytorch/datasets/movielens
+cd {project Dir}/datasets/movielens
 wget https://files.grouplens.org/datasets/movielens/ml-10m.zip
 unzip ml-10m.zip
 ```
